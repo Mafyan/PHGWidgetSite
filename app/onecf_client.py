@@ -9,11 +9,20 @@ from app.settings import settings
 
 
 class UpstreamError(RuntimeError):
-    def __init__(self, message: str, *, status_code: int | None = None, body: str | None = None, url: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        body: str | None = None,
+        url: str | None = None,
+        www_authenticate: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.body = body
         self.url = url
+        self.www_authenticate = www_authenticate
 
 
 def _basic_auth_header(user: str, password: str) -> str:
@@ -23,13 +32,21 @@ def _basic_auth_header(user: str, password: str) -> str:
 
 def _headers() -> dict[str, str]:
     # В документации встречается "apikey" / "apiKey". Часто ожидают именно "apikey".
-    return {
+    headers: dict[str, str] = {
         "Authorization": _basic_auth_header(settings.onec_basic_user, settings.onec_basic_pass),
         "apikey": settings.onec_api_key,
         "apiKey": settings.onec_api_key,
         "Accept": "application/json",
         "User-Agent": "Cooking-1CFitness-Proxy/1.0",
     }
+    # Как в вашем ServerApp: добавляем варианты secret/app key, если они заданы.
+    if settings.onec_secret_key:
+        headers["secretkey"] = settings.onec_secret_key
+        headers["secret_key"] = settings.onec_secret_key
+    if settings.onec_app_key:
+        headers["appkey"] = settings.onec_app_key
+        headers["app_key"] = settings.onec_app_key
+    return headers
 
 
 def _join_url(base: str, path: str) -> str:
@@ -42,7 +59,8 @@ async def get_classes(start_date: str, end_date: str, club_id: str | None = None
     Важно: параметры точного формата могут зависеть от 1C инсталляции.
     Мы передаем start_date/end_date как query.
     """
-    url = _join_url(settings.onec_base_url, "classes")
+    # Как в вашем ServerApp: эндпоинт со слешем в конце.
+    url = _join_url(settings.onec_base_url, "classes/")
     # На разных версиях API встречаются разные имена параметров.
     # Отправляем в двух вариантах для совместимости.
     params: list[tuple[str, str]] = [
@@ -56,7 +74,7 @@ async def get_classes(start_date: str, end_date: str, club_id: str | None = None
         params.append(("clubId", club_id))
 
     timeout = httpx.Timeout(settings.http_timeout_seconds)
-    async with httpx.AsyncClient(timeout=timeout, headers=_headers()) as client:
+    async with httpx.AsyncClient(timeout=timeout, headers=_headers(), follow_redirects=True) as client:
         try:
             resp = await client.get(url, params=params)
             resp.raise_for_status()
@@ -68,6 +86,7 @@ async def get_classes(start_date: str, end_date: str, club_id: str | None = None
                 status_code=e.response.status_code,
                 body=body,
                 url=str(e.request.url),
+                www_authenticate=e.response.headers.get("www-authenticate"),
             ) from e
         except httpx.RequestError as e:
             raise UpstreamError("Upstream request failed", url=str(e.request.url) if e.request else url) from e

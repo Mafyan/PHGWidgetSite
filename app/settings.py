@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     onec_basic_user: str
     onec_basic_pass: str
     onec_api_key: str
+    # Иногда 1C дополнительно требует эти ключи (в разных названиях).
+    onec_secret_key: str = ""
+    onec_app_key: str = ""
 
     cors_allow_origins: str = ""
 

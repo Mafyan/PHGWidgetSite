@@ -135,6 +135,7 @@ async def api_classes(
                 "status_code": e.status_code,
                 "url": e.url,
                 "body": e.body,
+                "www_authenticate": e.www_authenticate,
             }
         else:
             detail = "Upstream 1C Fitness error"
