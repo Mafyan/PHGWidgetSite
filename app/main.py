@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from app.onecf_client import get_classes
+from app.onecf_client import UpstreamError, get_classes
 from app.security import SlidingWindowRateLimiter
 from app.settings import settings
 
@@ -113,8 +113,20 @@ async def api_classes(
 
     try:
         raw = await get_classes(start_date=start_date, end_date=end_date, club_id=club_id)
-    except Exception as e:
+    except UpstreamError as e:
         logger.exception("Failed to fetch classes from 1C")
+        if settings.debug_upstream_errors:
+            detail = {
+                "message": "Upstream 1C Fitness error",
+                "status_code": e.status_code,
+                "url": e.url,
+                "body": e.body,
+            }
+        else:
+            detail = "Upstream 1C Fitness error"
+        raise HTTPException(status_code=502, detail=detail) from e
+    except Exception as e:
+        logger.exception("Failed to fetch classes from 1C (unexpected)")
         raise HTTPException(status_code=502, detail="Upstream 1C Fitness error") from e
 
     sanitized = [_sanitize_class(x) for x in raw if isinstance(x, dict)]

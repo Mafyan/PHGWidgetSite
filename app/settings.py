@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 15.0
 
     log_level: str = "INFO"
+    debug_upstream_errors: bool = False
 
     def cors_origins_list(self) -> list[str]:
         raw = (self.cors_allow_origins or "").strip()
