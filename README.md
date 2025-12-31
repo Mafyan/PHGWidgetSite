@@ -61,6 +61,39 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 <script src="/path/to/schedule-widget.js"></script>
 ```
 
+## Тест по IP (без домена)
+
+Для теста можно поднять сервис и ходить по IP.
+
+1) В `.env` временно откройте CORS для всех:
+
+```env
+CORS_ALLOW_ORIGINS=*
+```
+
+2) Запустите uvicorn на `0.0.0.0`:
+
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+3) Проверьте в браузере:
+- `http://SERVER_IP:8000/widget` (демо)
+
+4) Вставка виджета (для теста):
+
+```html
+<div
+  data-onec-schedule
+  data-api-base="http://SERVER_IP:8000"
+  data-start-date="2025-01-01 00:00"
+  data-end-date="2025-01-07 23:59"
+></div>
+<script src="/path/to/schedule-widget.js"></script>
+```
+
+> Важно: режим `CORS_ALLOW_ORIGINS=*` означает, что **любой сайт** сможет дергать ваше API. Для продакшена лучше вернуть whitelist доменов.
+
 ## Важно про параметры 1C
 
 Метод `{classes}` в разных установках 1C может ожидать query‑параметры с разными именами.  

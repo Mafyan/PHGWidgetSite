@@ -25,6 +25,8 @@ class Settings(BaseSettings):
         raw = (self.cors_allow_origins or "").strip()
         if not raw:
             return []
+        if raw == "*":
+            return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
 
 
