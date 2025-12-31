@@ -106,11 +106,28 @@
       var startDate = n.getAttribute("data-start-date") || "";
       var endDate = n.getAttribute("data-end-date") || "";
 
+      // Если даты не заданы — грузим на 4 недели вперёд (пусть бэкенд тоже умеет это).
+      if (!startDate || !endDate) {
+        var now = new Date();
+        now.setSeconds(0, 0);
+        var end = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
+        function fmt(d) {
+          var y = d.getFullYear();
+          var m = String(d.getMonth() + 1).padStart(2, "0");
+          var day = String(d.getDate()).padStart(2, "0");
+          var hh = String(d.getHours()).padStart(2, "0");
+          var mm = String(d.getMinutes()).padStart(2, "0");
+          return y + "-" + m + "-" + day + " " + hh + ":" + mm;
+        }
+        startDate = fmt(now);
+        endDate = fmt(end);
+      }
+
       n.style.fontFamily = "system-ui, -apple-system, Segoe UI, Roboto, Arial";
       n.style.maxWidth = n.style.maxWidth || "920px";
 
-      if (!apiBase || !startDate || !endDate) {
-        n.textContent = "Виджет: не заданы data-api-base / data-start-date / data-end-date";
+      if (!apiBase) {
+        n.textContent = "Виджет: не задан data-api-base";
         continue;
       }
 

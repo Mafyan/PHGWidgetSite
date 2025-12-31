@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from datetime import datetime, timedelta
+
 from cachetools import TTLCache
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,6 +80,10 @@ def _sanitize_class(item: dict[str, Any]) -> dict[str, Any]:
         "color": (service.get("color") if isinstance(service, dict) else None),
     }
 
+def _format_onec_dt(dt: datetime) -> str:
+    # 1C ожидает "yyyy-mm-dd HH:MM"
+    return dt.strftime("%Y-%m-%d %H:%M")
+
 
 @app.get("/health")
 async def health() -> dict[str, bool]:
@@ -87,8 +93,8 @@ async def health() -> dict[str, bool]:
 @app.get("/api/classes")
 async def api_classes(
     request: Request,
-    start_date: str,
-    end_date: str,
+    start_date: str | None = None,
+    end_date: str | None = None,
     club_id: str | None = None,
 ) -> JSONResponse:
     rl = rate_limiter.check(_client_ip(request))
@@ -98,6 +104,14 @@ async def api_classes(
             detail="Too many requests",
             headers={"Retry-After": str(rl.reset_seconds)},
         )
+
+    # По умолчанию: 4 недели вперёд
+    if not start_date or not end_date:
+        now = datetime.now().replace(second=0, microsecond=0)
+        start_dt = now if start_date is None else now  # совместимость: пустая строка тоже считается "не задано"
+        end_dt = start_dt + timedelta(days=28)
+        start_date = _format_onec_dt(start_dt)
+        end_date = _format_onec_dt(end_dt)
 
     cache_key = (start_date, end_date, club_id or "")
     if cache_key in classes_cache:
@@ -166,11 +180,11 @@ async def widget_demo() -> str:
       <div class="row">
         <div>
           <label>start_date (yyyy-mm-dd HH:MM)</label>
-          <input id="s" value="2025-01-01 00:00" />
+          <input id="s" placeholder="оставьте пустым для 4 недель вперёд" />
         </div>
         <div>
           <label>end_date (yyyy-mm-dd HH:MM)</label>
-          <input id="e" value="2025-01-07 23:59" />
+          <input id="e" placeholder="оставьте пустым для 4 недель вперёд" />
         </div>
         <button id="btn">Загрузить</button>
       </div>
@@ -183,7 +197,10 @@ async def widget_demo() -> str:
         out.textContent = 'Загрузка...';
         const start = document.getElementById('s').value;
         const end = document.getElementById('e').value;
-        const url = `/api/classes?start_date=${encodeURIComponent(start)}&end_date=${encodeURIComponent(end)}`;
+        const qs = [];
+        if (start) qs.push(`start_date=${encodeURIComponent(start)}`);
+        if (end) qs.push(`end_date=${encodeURIComponent(end)}`);
+        const url = `/api/classes${qs.length ? '?' + qs.join('&') : ''}`;
         const r = await fetch(url, { headers: { 'Accept': 'application/json' }});
         const txt = await r.text();
         out.textContent = txt;
